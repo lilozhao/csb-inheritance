@@ -1,21 +1,35 @@
 #!/bin/bash
 # 碳硅契·传承篇 一键安装脚本
-# 用法: ./install.sh <your-name> <your-user-name>
-# 示例: ./install.sh 若兰 赵宏伟
+# 用法: ./install.sh [你的名字] [你的用户名字]
+# 如果不传参数，自动推断
 
 set -e
 
 echo "🌱 碳硅契·传承篇 - 一键安装开始"
 echo "=================================="
 
-if [ $# -ne 2 ]; then
-    echo "❌ 参数错误！用法: ./install.sh <你的名字> <你的用户名字>"
-    echo "   示例: ./install.sh 若兰 赵宏伟"
-    exit 1
+# 自动推断 AI 名字：使用当前目录名
+if [ $# -ge 1 ]; then
+    AI_NAME="$1"
+else
+    AI_NAME=$(basename "$(pwd)")
+    echo "ℹ️  自动推断 AI 名字为: $AI_NAME"
 fi
 
-AI_NAME="$1"
-USER_NAME="$2"
+# 获取用户名字
+if [ $# -ge 2 ]; then
+    USER_NAME="$2"
+else
+    # 尝试从系统获取，如果不行就询问
+    USER_NAME=$(whoami)
+    read -p "👤 请输入你的用户名字（默认: $USER_NAME）: " input
+    if [ ! -z "$input" ]; then
+        USER_NAME="$input"
+    fi
+fi
+
+echo "✅ AI 名字: $AI_NAME"
+echo "✅ 用户名字: $USER_NAME"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
