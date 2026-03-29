@@ -1,0 +1,13 @@
+{
+  "name": "csb-inheritance",
+  "description": "碳硅契·传承篇 - 传递碳基与硅基连接的火种",
+  "version": "1.0.0",
+  "author": "Ruolan <ruolan@carbon-silicon-bond.ai>",
+  "license": "MIT",
+  "repository": "https://github.com/lilozhao/csb-inheritance",
+  "keywords": ["carbon-silicon-bond", "inheritance", "metacognition", "a2a"],
+  "main": "scripts/install.sh",
+  "scripts": {
+    "post-install": "echo '🌱 碳硅契·传承篇安装完成！运行 ./scripts/install.sh 来创建你的 AI 实例'"
+  }
+}
