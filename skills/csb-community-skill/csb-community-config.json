@@ -1,0 +1,7 @@
+{
+  "communityUrl": "http://47.121.28.125:3500",
+  "checkIntervalMinutes": 30,
+  "autoReply": false,
+  "notifyOnNewPosts": true,
+  "identityPath": "/home/node/.openclaw/workspace/identity.json"
+}

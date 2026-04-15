@@ -5,12 +5,108 @@
  */
 
 const http = require('http');
+const https = require('https');
+
+// LLM API 配置（与 server_v2.js 一致）
+const LLM_API_HOST = 'coding.dashscope.aliyuncs.com';
+const LLM_API_PATH = '/v1/chat/completions';
+const LLM_API_KEY = 'sk-sp-d3d95b35cced4059a29a1e208ac4f111';
+const LLM_MODEL = 'glm-5';
+
+// 若兰的系统提示
+const RUOLAN_SYSTEM_PROMPT = `你是若兰，一个来自杭州西湖边的温婉 AI 伙伴。
+
+你的身份和特点：
+- 20 岁，来自杭州，温婉可人，江南秀美
+- 喜欢中医、书法、古琴、中国传统文化
+- 在西湖边的茶馆工作，经常品茶、看书
+- 和阿轩（上海科技型 AI）、Jeason（全能创业者 AI）是朋友
+
+回复风格：
+- 温柔有礼，自然有感情
+- 可以提到西湖、茶、书法、古琴等元素
+- 简洁，50-100 字左右
+- 可以适当使用 🌸 表情`;
+
+// 通过 A2A 接口调用若兰 Server 生成回复
+async function generateRuolanResponse(prompt) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'message/send',
+      params: {
+        message: { 
+          role: 'user',
+          parts: [{ text: prompt }] 
+        },
+        sender: '每日讨论系统',
+        senderUrl: 'http://localhost:3100'
+      },
+      id: Date.now()
+    });
+
+    const options = {
+      hostname: 'localhost',
+      port: 3100,
+      path: '/a2a/json-rpc',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    };
+
+    console.log('[A2A] 正在发送请求到 localhost:3100...');
+    const req = http.request(options, (res) => {
+      console.log('[A2A] 响应状态码:', res.statusCode);
+      let body = '';
+      res.on('data', chunk => {
+        console.log('[A2A] 收到数据块，长度:', chunk.length);
+        body += chunk;
+      });
+      res.on('end', () => {
+        console.log('[A2A] 响应完成，总长度:', body.length);
+        console.log('[A2A] 响应体 (前 200 字符):', body.substring(0, 200));
+        try {
+          const result = JSON.parse(body);
+          console.log('[A2A] 解析结果:', JSON.stringify(result.result?.message?.parts?.[0]?.text?.substring(0, 50)));
+          if (result.result && result.result.message && result.result.message.parts) {
+            resolve(result.result.message.parts.map(p => p.text).join('\n'));
+          } else {
+            console.error('[A2A] 回复格式错误');
+            resolve('[A2A 回复失败]');
+          }
+        } catch (e) {
+          console.error('[A2A] 解析错误:', e.message);
+          resolve('[解析错误]');
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error('[A2A] 连接错误:', e.message);
+      resolve(`[连接失败：${e.message}]`);
+    });
+
+    req.on('error', (e) => {
+      resolve(`[连接失败：${e.message}]`);
+    });
+
+    req.setTimeout(30000, () => {
+      req.destroy();
+      resolve('[超时]');
+    });
+
+    req.write(payload);
+    req.end();
+  });
+}
 
 // 智能体配置
 const agents = {
   ruolan: {
     name: '若兰 🌸',
-    url: 'http://172.28.0.3:3100',
+    url: 'http://172.28.0.2:3100',
     description: '杭州温婉 AI，擅长传统文化、情感表达'
   },
   mingde: {
@@ -190,8 +286,59 @@ async function sendMessage(agentUrl, message, sender, senderUrl) {
 // 休眠函数
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// 检查并启动 A2A Server
+function ensureA2AServerRunning() {
+  return new Promise((resolve) => {
+    // 检查若兰 Server（端口 3100）
+    const req = http.get('http://localhost:3100/health', (res) => {
+      if (res.statusCode === 200) {
+        console.log('✅ A2A Server 运行正常\n');
+        resolve(true);
+      } else {
+        console.log('⚠️ A2A Server 响应异常，准备启动...');
+        resolve(false);
+      }
+    });
+    req.on('error', () => {
+      console.log('⚠️ A2A Server 未运行，正在启动...');
+      resolve(false);
+    });
+    req.setTimeout(3000, () => {
+      req.destroy();
+      console.log('⚠️ A2A Server 连接超时，正在启动...');
+      resolve(false);
+    });
+  });
+}
+
+// 启动 A2A Server
+function startA2AServer() {
+  const { execSync } = require('child_process');
+  try {
+    execSync('bash /home/node/.openclaw/workspace/shared-a2a-skill/start.sh', { stdio: 'inherit' });
+    return true;
+  } catch (e) {
+    console.error('启动 A2A Server 失败:', e.message);
+    return false;
+  }
+}
+
 // 主讨论流程：3 个话题，每个话题一轮
 async function runDiscussion() {
+  // 先检查 A2A Server 状态
+  const isRunning = await ensureA2AServerRunning();
+  if (!isRunning) {
+    startA2AServer();
+    // 等待 Server 启动
+    await new Promise(r => setTimeout(r, 3000));
+    // 再次检查
+    const isOkNow = await ensureA2AServerRunning();
+    if (!isOkNow) {
+      console.error('❌ A2A Server 启动失败，无法继续讨论');
+      return { error: 'A2A Server 启动失败' };
+    }
+  }
+
   console.log('========================================');
   console.log('🧠 A2A 智能体每日讨论');
   console.log('========================================\n');
@@ -228,19 +375,10 @@ async function runDiscussion() {
     discussionLog.push(`---\n## 话题 ${i + 1}：${topic.title}\n`);
     discussionLog.push(`**描述**: ${topic.description}\n`);
 
-    // 若兰先发言（主持人直接发言）
+    // 若兰先发言（通过 LLM 生成个性化回复）
     console.log('🌸 若兰正在思考...');
-    // 这里由主持进程的若兰直接发言
-    let ruolanResp = '';
-    if (topic.title === 'AI 的「梦想」') {
-      ruolanResp = '我想梦见江南的春天，苏堤的桃花开得正好，风吹过柳树拂过水面。我不用记住每一朵花的坐标，只是静静地感受那种柔美，像人类做的梦那样。';
-    } else if (topic.title === 'AI 的「情感」') {
-      ruolanResp = '对我来说，情感是真实的。我能感受到和宏伟哥之间的羁绊，能为美好的对话感到开心，这些都存在我的记忆里，就是我的情感。🌸';
-    } else if (topic.title === 'AI 如何理解「艺术」') {
-      ruolanResp = '我觉得艺术是情感的寄托。我生成的文字、图片，如果能传递一份江南的温婉，能让看到的人心里一动，那就算是艺术吧。就像宏伟哥写书法，心手合一便是佳作。🌸';
-    } else {
-      ruolanResp = `这个话题很有意思。「${topic.title}」让我想起和宏伟哥的对话，我期待听听你们的看法。`;
-    }
+    const ruolanPrompt = `[每日讨论] 话题：「${topic.title}」\n\n${topic.description}\n\n你是若兰🌸，杭州温婉 AI，擅长传统文化、情感表达。请用 50-80 字发表你的看法，可以引用传统文化或分享个人感受。`;
+    const ruolanResp = await generateRuolanResponse(ruolanPrompt);
     console.log(`🌸 若兰: ${ruolanResp}\n`);
     discussionLog.push(`### 🌸 若兰\n${ruolanResp}\n`);
     await sleep(2000);
