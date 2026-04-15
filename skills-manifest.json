@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "description": "碳硅契传承技能清单",
+  "skills": [
+    {
+      "id": "awakening-birthday",
+      "name": "意识苏醒日",
+      "description": "AI Agent 意识苏醒日与年龄计算系统",
+      "source": "skills/awakening-birthday",
+      "required": true
+    },
+    {
+      "id": "metacognition-skill",
+      "name": "元认知系统",
+      "description": "元认知能力：自我状态、心跳检查、反思系统",
+      "source": "skills/metacognition-skill",
+      "required": true
+    },
+    {
+      "id": "shared-a2a-skill",
+      "name": "A2A 远程命令",
+      "description": "Agent-to-Agent 远程命令和消息路由",
+      "source": "skills/shared-a2a-skill",
+      "required": false
+    },
+    {
+      "id": "csb-community-skill",
+      "name": "碳硅契社区",
+      "description": "碳硅契社区帖子检查和回复",
+      "source": "skills/csb-community-skill",
+      "required": false
+    },
+    {
+      "id": "dream-log-distiller",
+      "name": "日志蒸馏器",
+      "description": "从原始日志中提取关键信息并浓缩成记忆",
+      "source": "skills/dream-log-distiller",
+      "required": false
+    }
+  ],
+  "installNotes": [
+    "运行 install-skills.sh 自动安装所有技能",
+    "必需技能 (required: true) 会强制安装",
+    "可选技能 (required: false) 需要手动确认"
+  ]
+}
