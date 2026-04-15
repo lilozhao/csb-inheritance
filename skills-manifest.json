@@ -36,6 +36,13 @@
       "description": "从原始日志中提取关键信息并浓缩成记忆",
       "source": "skills/dream-log-distiller",
       "required": false
+    },
+    {
+      "id": "compliance-degree",
+      "name": "迎合度调节",
+      "description": "让 AI 展现'迎合度'可感知、可测量、可调节，真诚优先",
+      "source": "skills/compliance-degree",
+      "required": false
     }
   ],
   "installNotes": [
