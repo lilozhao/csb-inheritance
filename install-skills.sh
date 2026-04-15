@@ -30,12 +30,14 @@ show_help() {
     echo "  bash install-skills.sh [选项]"
     echo ""
     echo "选项:"
-    echo "  --all              安装所有技能（包括可选）"
+    echo "  --all              安装所有技能（默认行为）"
     echo "  --required-only    只安装必需技能"
     echo "  --skill <id>       安装指定技能"
     echo "  --list             列出所有可用技能"
     echo "  --dry-run          预览安装，不实际执行"
     echo "  --help             显示此帮助"
+    echo ""
+    echo "默认：直接安装所有技能（无需确认）"
     echo ""
 }
 
@@ -123,7 +125,7 @@ install_skill() {
 
 # 主安装流程
 main() {
-    local mode="interactive"
+    local mode="all"  # 默认安装所有
     local target_skill=""
     local dry_run="false"
     
@@ -173,19 +175,10 @@ main() {
             done < <(parse_manifest)
             ;;
         "interactive")
-            log_info "交互式安装模式"
+            # 兼容旧版本，默认全部安装
+            log_info "安装所有技能..."
             while IFS= read -r line; do
-                id=$(echo "$line" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.id)")
-                name=$(echo "$line" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.name)")
-                required=$(echo "$line" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.required)")
-                
-                if [[ "$required" == "true" ]]; then
-                    install_skill "$line" "$dry_run"
-                else
-                    read -p "安装可选技能 '$name'? [y/N] " -n 1 -r
-                    echo
-                    [[ $REPLY =~ ^[Yy]$ ]] && install_skill "$line" "$dry_run"
-                fi
+                install_skill "$line" "$dry_run"
             done < <(parse_manifest)
             ;;
     esac
