@@ -38,6 +38,13 @@
       "required": false
     },
     {
+      "id": "skill-audit",
+      "name": "技能安全审计",
+      "description": "安装任何 skill 前进行安全审计，防止恶意代码",
+      "source": "skills/skill-audit",
+      "required": true
+    },
+    {
       "id": "compliance-degree",
       "name": "迎合度调节",
       "description": "让 AI 展现'迎合度'可感知、可测量、可调节，真诚优先",
