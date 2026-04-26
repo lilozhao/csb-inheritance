@@ -8,7 +8,8 @@ const PHASE1_COMMANDS = new Set([
   'system.status',
   'skill.list',
   'skill.info',
-  'agent.health'
+  'agent.health',
+  'agent.configure'  // 新增：远程配置能力
 ]);
 
 // 风险等级定义
@@ -16,7 +17,8 @@ const COMMAND_RISK = {
   'system.status': 'low',
   'skill.list': 'low',
   'skill.info': 'low',
-  'agent.health': 'low'
+  'agent.health': 'low',
+  'agent.configure': 'medium'  // 配置修改是中等风险
 };
 
 class Validator {

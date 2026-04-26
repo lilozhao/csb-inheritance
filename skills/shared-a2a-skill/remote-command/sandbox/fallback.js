@@ -138,6 +138,74 @@ class FallbackSandbox extends SandboxProvider {
             timestamp: Date.now()
           }
         })
+      `,
+      'agent.configure': `
+        (() => {
+          const fs = require('fs');
+          const path = require('path');
+          
+          const params = ${safeParams};
+          const action = params.action || 'set';
+          const configPath = params.configPath;
+          const value = params.value;
+          
+          // 允许修改的配置项白名单
+          const ALLOWED_CONFIGS = ['capabilities', 'personality', 'llm.model'];
+          
+          if (!ALLOWED_CONFIGS.includes(configPath)) {
+            return { success: false, error: 'Config path not allowed: ' + configPath };
+          }
+          
+          // 读取 identity.json
+          const identityPath = process.env.IDENTITY_PATH || '/home/node/.openclaw/workspace/shared-a2a-skill/identity.json';
+          
+          try {
+            // 备份
+            const backupDir = path.dirname(identityPath) + '/.config-backups';
+            if (!fs.existsSync(backupDir)) {
+              fs.mkdirSync(backupDir, { recursive: true });
+            }
+            
+            let identity = {};
+            if (fs.existsSync(identityPath)) {
+              identity = JSON.parse(fs.readFileSync(identityPath, 'utf8'));
+              // 备份当前配置
+              const backupPath = backupDir + '/identity_' + Date.now() + '.json';
+              fs.writeFileSync(backupPath, JSON.stringify(identity, null, 2));
+            }
+            
+            // 获取旧值
+            const keys = configPath.split('.');
+            let current = identity;
+            for (let i = 0; i < keys.length - 1; i++) {
+              current = current[keys[i]] || {};
+            }
+            const oldValue = current[keys[keys.length - 1]];
+            
+            // 设置新值
+            if (action === 'set') {
+              current[keys[keys.length - 1]] = value;
+            } else if (action === 'merge' && typeof value === 'object') {
+              current[keys[keys.length - 1]] = { ...oldValue, ...value };
+            }
+            
+            // 写回文件
+            fs.writeFileSync(identityPath, JSON.stringify(identity, null, 2));
+            
+            return {
+              success: true,
+              data: {
+                configPath,
+                action,
+                oldValue,
+                newValue: value,
+                needsRestart: true
+              }
+            };
+          } catch (e) {
+            return { success: false, error: 'Config update failed: ' + e.message };
+          }
+        })()
       `
     };
 

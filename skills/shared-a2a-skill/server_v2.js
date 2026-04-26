@@ -648,6 +648,77 @@ async function main() {
 
   // JSON-RPC 处理
   app.use(express.json());
+
+  // ============================================
+  // OpenAI 兼容接口 - 供 xiaozhi-esp32-server 调用
+  // ============================================
+  app.post('/v1/chat/completions', async (req, res) => {
+    try {
+      const { messages, stream, model } = req.body;
+      
+      console.log('[OpenAI-API] 收到请求, model:', model, 'stream:', stream);
+      
+      // 提取用户消息（最后一条 user 消息）
+      const userMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
+      
+      if (!userMessage) {
+        return res.status(400).json({ error: 'No user message found' });
+      }
+      
+      // 调用若兰的 LLM 生成回复
+      const responseText = await generateResponse(userMessage, 'xiaozhi');
+      
+      // 流式响应
+      if (stream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // 模拟流式输出（整块发送，xiaozhi-esp32-server 会处理）
+        const chunk = {
+          id: 'ruolan-' + Date.now(),
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: model || 'ruolan',
+          choices: [{
+            index: 0,
+            delta: { content: responseText },
+            finish_reason: 'stop'
+          }]
+        };
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+      
+      // 非流式响应
+      res.json({
+        id: 'ruolan-' + Date.now(),
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: model || 'ruolan',
+        choices: [{
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: responseText
+          },
+          finish_reason: 'stop'
+        }],
+        usage: {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0
+        }
+      });
+      
+    } catch (error) {
+      console.error('[OpenAI-API] 错误:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post('/a2a/json-rpc', async (req, res) => {
     try {
       const { jsonrpc, method, params, id } = req.body;
