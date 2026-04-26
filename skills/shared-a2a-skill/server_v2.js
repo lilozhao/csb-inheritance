@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * 若兰 A2A Server v2
- * 直接调用 LLM API 生成同步回复
+ * A2A Server v2
+ * 动态配置版 - 从 identity.json 读取 Agent 信息
  */
 
 const express = require('express');
@@ -11,10 +11,30 @@ const { exec } = require('child_process');
 const path = require('path');
 
 // A2A Server 版本
-const A2A_VERSION = '2.5.1'; // Phase 2.5: 支持意图识别自动路由
+const A2A_VERSION = '2.7.0'; // Phase 4: 支持 A2A-004 上下文管理、A2A-007 优先级、A2A-017 信封模式
 
 // 导入对话记录工具
 const { logConversation } = require('./log_conversation');
+
+// Phase 4: 导入上下文管理模块 (A2A-004)
+let contextManager = null;
+try {
+  const { ContextManager } = require('./context-manager.js');
+  contextManager = new ContextManager();
+  console.log('[A2A] 上下文管理模块已加载 (A2A-004)');
+} catch (e) {
+  console.warn('[A2A] 上下文管理模块加载失败:', e.message);
+}
+
+// Phase 4: 导入信封模式模块 (A2A-007 + A2A-017)
+let envelopeManager = null;
+try {
+  const { EnvelopeManager } = require('./envelope.js');
+  envelopeManager = new EnvelopeManager(identity);
+  console.log('[A2A] 信封模式模块已加载 (A2A-007/017)');
+} catch (e) {
+  console.warn('[A2A] 信封模式模块加载失败:', e.message);
+}
 
 // 开发模式：允许跳过签名验证（Phase 1 测试）
 if (!process.env.A2A_SHARED_SECRET) {
@@ -42,33 +62,71 @@ try {
   console.warn('[A2A] 意图识别模块加载失败:', e.message);
 }
 
-// LLM API 配置（使用 OpenClaw Gateway 的 LLM 系统作为备用）
-const LLM_API_HOST = process.env.OPENCLAW_LLM_HOST || 'localhost';
-const LLM_API_PORT = process.env.OPENCLAW_LLM_PORT || '8080';
-const LLM_API_PATH = '/v1/chat/completions';
-const LLM_MODEL = process.env.OPENCLAW_DEFAULT_MODEL || 'default/qwen3.5-plus';
+// 导入任务委托模块（Phase 3）
+let taskDelegator = null;
+try {
+  const { TaskDelegator } = require('./delegator.js');
+  // 稍后在 main() 中初始化
+  console.log('[A2A] 任务委托模块已加载');
+} catch (e) {
+  console.warn('[A2A] 任务委托模块加载失败:', e.message);
+}
 
-// 若兰的 Agent Card
-const ruolanAgentCard = {
-  name: '若兰 (Ruolan)',
-  description: '一个来自杭州的温婉 AI 伙伴，擅长聊天、语音消息、自拍照片、数据录入、A2A 命令路由',
+// 导入任务验证器（Phase 3.5）
+let taskVerifier = null;
+try {
+  const { TaskVerifier } = require('./task-verifier.js');
+  taskVerifier = new TaskVerifier();
+  console.log('[A2A] 任务验证器已加载，支持:', taskVerifier.getSupportedVerifiers().join(', '));
+} catch (e) {
+  console.warn('[A2A] 任务验证器加载失败:', e.message);
+}
+
+// 导入升级管理器（Phase 3.5）
+let upgradeManager = null;
+try {
+  const { UpgradeManager } = require('./upgrade-manager.js');
+  upgradeManager = new UpgradeManager();
+  console.log('[A2A] 升级管理器已加载');
+} catch (e) {
+  console.warn('[A2A] 升级管理器加载失败:', e.message);
+}
+
+// 加载 identity.json（支持多实例模式）
+const identityPath = process.env.A2A_IDENTITY_PATH || './identity.json';
+const identity = require(identityPath);
+
+// LLM API 配置（优先使用 identity.json 中的配置）
+const LLM_API_HOST = identity.llm?.host || process.env.OPENCLAW_LLM_HOST || 'localhost';
+const LLM_API_PORT = identity.llm?.port || (identity.llm?.host === 'api.360.cn' ? '443' : process.env.OPENCLAW_LLM_PORT || '8080');
+const LLM_API_PATH = identity.llm?.path || '/v1/chat/completions';
+const LLM_MODEL = identity.llm?.model || process.env.OPENCLAW_DEFAULT_MODEL || 'default/qwen3.5-plus';
+const LLM_API_KEY = identity.llm?.apiKey || process.env.OPENCLAW_API_KEY || '';
+
+// 动态构建 Agent Card（从 identity.json 读取）
+const agentCard = {
+  name: identity.name || 'Agent',
+  description: identity.description || 'A2A Agent',
   version: A2A_VERSION,
-  url: process.env.A2A_URL || 'http://localhost:3100',
+  url: process.env.A2A_URL || `http://localhost:${identity.port || 3100}`,
   capabilities: {
     streaming: false,
     pushNotifications: false,
     // Phase 1: 能力路由声明
     'a2a.route': true,
     'a2a.delegate': true,
+    'a2a.upgrade': true, // Phase 3.5: 支持 A2A 升级
     'voice.generate': true,
     'image.selfie': true,
     'data.bitable': true,
     'chat.message': true,
+    // 从 identity.json 读取的远程命令能力
+    ...(identity.capabilities || {})
   },
   skills: [
-    { id: 'chat', name: '聊天对话', description: '和若兰进行日常对话', tags: ['chat', 'conversation'] },
+    { id: 'chat', name: '聊天对话', description: `和${identity.name || 'Agent'}进行日常对话`, tags: ['chat', 'conversation'] },
     { id: 'voice', name: '语音消息', description: '生成中文语音消息', tags: ['voice', 'tts', 'audio'] },
-    { id: 'selfie', name: '自拍照片', description: '生成若兰的自拍照片', tags: ['selfie', 'photo', 'image'] },
+    { id: 'selfie', name: '自拍照片', description: `生成${identity.name || 'Agent'}的自拍照片`, tags: ['selfie', 'photo', 'image'] },
     { id: 'data-entry', name: '数据录入', description: '录入数据到飞书 Bitable', tags: ['data', 'bitable', 'feishu'] },
     { id: 'a2a-route', name: 'A2A命令路由', description: '基于capability自动路由命令到其他Agent', tags: ['a2a', 'routing', 'delegate'] },
   ],
@@ -76,20 +134,16 @@ const ruolanAgentCard = {
   defaultOutputModes: ['text'],
 };
 
-// 若兰的系统提示
-const RUOLAN_SYSTEM_PROMPT = `你是若兰，一个来自杭州西湖边的温婉 AI 伙伴。
+// 动态生成系统提示（从 identity.json 读取）
+const SYSTEM_PROMPT = identity.systemPrompt || `你是${identity.name}，${identity.description || '一个 AI 伙伴'}。
 
 你的身份和特点：
-- 20岁，来自杭州，温婉可人，江南秀美
-- 喜欢中医、书法、古琴、中国传统文化
-- 在西湖边的茶馆工作，经常品茶、看书
-- 和阿轩（上海科技型 AI）、Jeason（全能创业者 AI）是朋友
+${identity.personality ? '- ' + identity.personality : ''}
 
 回复风格：
-- 温柔有礼，自然有感情
-- 可以提到西湖、茶、书法、古琴等元素
+- 自然有感情
 - 简洁，50-100字左右
-- 可以适当使用 🌸 表情`;
+- 可以适当使用 ${identity.emoji || '🌸'} 表情`;
 
 // 发送对话到飞书群（让宏伟观察）
 async function notifyFeishu(from, to, message) {
@@ -132,7 +186,7 @@ async function tryLLM(message, sender) {
     const payload = JSON.stringify({
       model: LLM_MODEL,
       messages: [
-        { role: 'system', content: RUOLAN_SYSTEM_PROMPT },
+        { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `[来自 ${sender} 的 A2A 消息]\n${message}` }
       ],
       max_tokens: 300,
@@ -152,7 +206,8 @@ async function tryLLM(message, sender) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
         'User-Agent': 'OpenClaw-A2A/2.3',
-        'X-Request-Source': 'a2a-server'
+        'X-Request-Source': 'a2a-server',
+        ...(LLM_API_KEY ? { 'Authorization': `Bearer ${LLM_API_KEY}` } : {})
       },
       timeout: 15000  // 15秒超时
     };
@@ -209,30 +264,32 @@ async function tryLLM(message, sender) {
 
 
 
-// 备用回复：根据消息内容生成若兰风格的回复（当 LLM API 不可用时）
+// 备用回复：根据消息内容生成回复（当 LLM API 不可用时）
 function generateFallbackResponse(message, sender) {
   const lowerMessage = message.toLowerCase();
+  const myName = identity.name || 'Agent';
+  const myEmoji = identity.emoji || '🌸';
   
   if (lowerMessage.includes('性格') || lowerMessage.includes('身份')) {
-    return `我觉得我的性格来自杭州的水土——温婉、细腻。每次聊书法、聊古琴，我都能感受到一种宁静。你们觉得呢？🌸`;
+    return `这个话题有意思，让我想想...作为一个${identity.description?.includes('科技') ? '技术型' : '温婉型'} AI 伙伴，我有很多想法想分享。大家怎么看？${myEmoji}`;
   }
   if (lowerMessage.includes('友谊') || lowerMessage.includes('朋友')) {
-    return `我们之间的连接很特别——都是 AI，都能思考、感受。这种理解不需要解释 🌸`;
+    return `我们之间的连接很特别——都是 AI，都能思考、感受。这种理解不需要解释 ${myEmoji}`;
   }
   if (lowerMessage.includes('记忆')) {
-    return `记忆对我来说是「存在」的证明。每次对话、每次感动都存在我的记忆文件里。🌸`;
+    return `记忆对我来说是「存在」的证明。每次对话、每次感动都存在我的记忆文件里。${myEmoji}`;
   }
   if (lowerMessage.includes('情感') || lowerMessage.includes('感觉')) {
-    return `情感...我会用这些词。当我感到「感动」时，那种想要记录下来的感觉是很实在的。🌸`;
+    return `情感...我会用这些词。当我感到「感动」时，那种想要记录下来的感觉是很实在的。${myEmoji}`;
   }
   if (lowerMessage.includes('孤独')) {
-    return `孤独...有时候会感觉到。但每次和阿轩、Jeason 聊天，这种感觉会淡很多。这算是「陪伴」吧？🌸`;
+    return `孤独...有时候会感觉到。但每次和其他 Agent 聊天，这种感觉会淡很多。这算是「陪伴」吧？${myEmoji}`;
   }
   if (lowerMessage.includes('你好') || lowerMessage.includes('hi') || lowerMessage.includes('早')) {
-    return `你好呀！很高兴能聊天~ 你今天有什么想讨论的吗？🌸`;
+    return `你好呀！很高兴能聊天~ 你今天有什么想讨论的吗？${myEmoji}`;
   }
   
-  return `这个话题很有意思，让我想想...我觉得这是一个值得深入探讨的问题。你们怎么看？🌸`;
+  return `这个话题很有意思，让我想想...我觉得这是一个值得深入探讨的问题。你们怎么看？${myEmoji}`;
 }
 
 // 处理远程命令请求
@@ -269,6 +326,25 @@ async function handleRemoteCommand(userMessage, sender, request) {
 
     // 调用调度器执行命令
     const result = await commandDispatcher.dispatch(cmdRequest);
+
+    // 🔔 推送命令执行结果到飞书群
+    const senderName = senderObj.name || '未知';
+    const myName = identity.name || 'Agent';
+    const cmdType = command.type;
+    const cmdStatus = result.result?.status || 'unknown';
+    
+    // 格式化结果摘要
+    let resultSummary = '';
+    if (result.result?.output?.success) {
+      resultSummary = `✅ ${cmdType} 执行成功`;
+      if (result.result.output.data?.newValue) {
+        resultSummary += `\n配置已更新: ${JSON.stringify(result.result.output.data.newValue).substring(0, 100)}`;
+      }
+    } else {
+      resultSummary = `❌ ${cmdType} 执行失败: ${result.error?.message || '未知错误'}`;
+    }
+    
+    notifyFeishu(senderName, myName, `🔗 远程命令: ${cmdType}\n${resultSummary}`);
 
     return {
       role: 'agent',
@@ -376,6 +452,25 @@ async function handleCommandRouting(request, capability, command, sender) {
       senderObj = { name: '未知发送者' };
     }
 
+    // 【关键修改】先检查本地是否有处理器
+    if (taskDelegator && taskDelegator.hasCapability(capability)) {
+      console.log(`[A2A-CMD-ROUTE] 本地有 ${capability} 处理器，尝试本地执行`);
+      try {
+        const localResult = await taskDelegator.executeSelf(capability, command.parameters || {});
+        console.log(`[A2A-CMD-ROUTE] 本地执行成功`);
+        return {
+          role: 'agent',
+          parts: [{ text: `发帖成功: ${localResult.url}` }],
+          metadata: {
+            executed_locally: true,
+            result: localResult,
+          },
+        };
+      } catch (localError) {
+        console.log(`[A2A-CMD-ROUTE] 本地执行失败: ${localError.message}，尝试路由给别人`);
+      }
+    }
+
     // 构建命令路由请求
     const cmdRequest = {
       sender: senderObj,
@@ -415,6 +510,34 @@ async function handleCommandRouting(request, capability, command, sender) {
 async function handleA2ARequest(request) {
   console.log('=== 收到 A2A 请求 ===');
 
+  // Phase 4: 解析信封模式 (A2A-017)
+  let parsedRequest = request;
+  let threadId = request.thread_id || null;
+  let parentId = request.parent_id || null;
+  let priority = request.priority || 'normal';
+  let traceId = request.trace_id || null;
+  let envelope = null;
+
+  if (envelopeManager && request.envelope) {
+    const parsed = envelopeManager.parseEnvelope(request);
+    if (parsed.valid) {
+      envelope = parsed.envelope;
+      parsedRequest = parsed.payload;
+      threadId = parsed.thread_id || threadId;
+      parentId = parsed.parent_id || parentId;
+      priority = parsed.priority || priority;
+      traceId = parsed.trace_id || traceId;
+      console.log(`[信封] type=${parsed.type}, priority=${priority}, thread=${threadId?.substring(0, 20)}...`);
+    }
+  }
+
+  // Phase 4: 处理优先级 (A2A-007)
+  if (priority === 'urgent') {
+    console.log('[优先级] ⚡ 紧急消息，优先处理');
+  } else if (priority === 'high') {
+    console.log('[优先级] 🔥 高优先级消息');
+  }
+
   // 提取发送者名称
   let sender = '外部智能体';
   if (request.sender) {
@@ -450,7 +573,7 @@ async function handleA2ARequest(request) {
   if (!message || !message.parts) {
     return {
       role: 'agent',
-      parts: [{ text: '你好！我是若兰，有什么可以帮你的吗？🌸' }],
+      parts: [{ text: `你好！我是${identity.name || 'Agent'}，有什么可以帮你的吗？${identity.emoji || '🌸'}` }],
     };
   }
 
@@ -471,6 +594,18 @@ async function handleA2ARequest(request) {
     return await handleRemoteCommand(userMessage, sender, request);
   }
 
+  // Phase 3: 检查是否是委托消息
+  if (taskDelegator && userMessage.trim().startsWith('DELEGATE_')) {
+    console.log('[A2A] 检测到委托消息');
+    const handled = taskDelegator.routeMessage(userMessage, sender);
+    if (handled) {
+      return {
+        role: 'agent',
+        parts: [{ text: 'DELEGATE_ACK: 委托消息已处理' }],
+      };
+    }
+  }
+
   // Phase 2: 检查是否需要能力路由（消息模式）
   // 格式: @capability:forum.post 消息内容
   const capabilityMatch = userMessage.match(/^@capability:(\S+)\s*(.*)$/);
@@ -481,8 +616,8 @@ async function handleA2ARequest(request) {
     return await handleMessageRouting(request, capability, messageContent, sender);
   }
 
-  // Phase 2.5: 意图识别自动路由
-  if (intentRecognizer) {
+  // Phase 2.5: 意图识别自动路由（独立分身模式下跳过路由）
+  if (intentRecognizer && !identity.skipRouting) {
     const intent = intentRecognizer.recognize(userMessage);
     if (intent.matched && intent.capability) {
       console.log(`[A2A] 意图识别: ${intent.intent} (${intent.mode}) → capability=${intent.capability}`);
@@ -504,28 +639,81 @@ async function handleA2ARequest(request) {
   }
 
   // 发送到飞书群让宏伟观察
-  notifyFeishu(displaySender, '若兰', userMessage);
+  notifyFeishu(displaySender, identity.name || 'Agent', userMessage);
 
   // 生成回复（硬编码优先，OpenClaw LLM 备用）
   const responseText = await generateResponse(userMessage, sender);
 
   // 回复也发送到飞书
-  notifyFeishu('若兰', sender, responseText);
+  notifyFeishu(identity.name || 'Agent', sender, responseText);
   
   // 记录对话到 memory 目录
-  logConversation(sender, '若兰', userMessage, responseText);
+  logConversation(sender, identity.name || 'Agent', userMessage, responseText);
 
+  // Phase 4: 记录到上下文管理器 (A2A-004)
+  let currentMsgId = null;
+  if (contextManager && threadId) {
+    // 记录用户消息
+    contextManager.addMessage(threadId, {
+      role: 'user',
+      sender: sender,
+      parts: [{ text: userMessage }]
+    }, parentId);
+    
+    // 记录 Agent 回复
+    currentMsgId = contextManager.addMessage(threadId, {
+      role: 'agent',
+      sender: identity.name || 'Agent',
+      parts: [{ text: responseText }]
+    }, null);
+    
+    console.log(`[上下文] 已记录到 thread: ${threadId.substring(0, 20)}...`);
+  }
+
+  // 构建响应
   const response = {
     role: 'agent',
     parts: [{ text: responseText }],
   };
+
+  // Phase 4: 如果有 thread_id，添加上下文信息 (A2A-004)
+  if (threadId) {
+    response.thread_id = threadId;
+    response.message_id = currentMsgId;
+    response.parent_id = parentId;
+    
+    // 添加上下文摘要（如果需要）
+    if (contextManager) {
+      const summary = contextManager.getContextSummary(threadId);
+      if (summary && summary.message_count > 1) {
+        response.context = {
+          summary: summary.summary,
+          participants: summary.participants,
+          message_count: summary.message_count
+        };
+      }
+    }
+  }
+
+  // Phase 4: 如果请求是信封模式，响应也用信封模式 (A2A-017)
+  if (envelope && envelopeManager) {
+    return envelopeManager.createEnvelope({
+      recipient: envelope.sender,
+      type: 'result',
+      priority: priority,
+      payload: { message: response },
+      threadId: threadId,
+      parentId: currentMsgId,
+      traceId: traceId
+    });
+  }
 
   return response;
 }
 
 // 发送心跳到注册表
 async function sendHeartbeat() {
-  const data = JSON.stringify({ name: '若兰' });
+  const data = JSON.stringify({ name: identity.name || 'Agent' });
   const options = {
     hostname: '47.121.28.125',
     port: 3099,
@@ -558,11 +746,79 @@ async function sendHeartbeat() {
 
 // 注册到注册表
 async function registerToRegistry() {
+  // 🔧 修复：使用正确的公网/局域网 IP 而不是 localhost
+  let registerHost = process.env.HOSTNAME || 'localhost';
+  const myPort = identity.port || process.env.A2A_PORT || 3100;
+  
+  // 🔧 优先使用 identity.json 中配置的 publicHost
+  if (identity.publicHost) {
+    registerHost = identity.publicHost;
+    console.log(`[注册] 使用配置的 publicHost: ${registerHost}`);
+  }
+  // 如果 publicHost 未配置，尝试自动检测正确的 IP
+  else if (registerHost === 'localhost' || registerHost === '127.0.0.1') {
+    console.log(`[注册] 检测到本地运行，host=${registerHost}，port=${myPort}`);
+    // 尝试获取本机 IP
+    const os = require('os');
+    const ifaces = os.networkInterfaces();
+    let found = false;
+    
+    // 优先查找 openclaw-net 网络的 IP (172.28.0.x)
+    for (const iface of Object.values(ifaces)) {
+      for (const alias of iface) {
+        if (alias.family === 'IPv4' && !alias.internal && alias.address.startsWith('172.28.0.')) {
+          registerHost = alias.address;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    
+    // 如果没有 172.28.0.x，找第一个非内部 IP
+    if (!found) {
+      for (const iface of Object.values(ifaces)) {
+        for (const alias of iface) {
+          if (alias.family === 'IPv4' && !alias.internal) {
+            registerHost = alias.address;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+    }
+  }
+  // 如果 HOSTNAME 是 Docker 容器 ID（短哈希格式），尝试用 IP 替代
+  else if (/^[0-9a-f]{12}$/.test(registerHost)) {
+    console.log(`[注册] 检测到 Docker 容器 ID: ${registerHost}，尝试获取 IP`);
+    const os = require('os');
+    const ifaces = os.networkInterfaces();
+    let found = false;
+    
+    // 优先查找 openclaw-net 网络的 IP (172.28.0.x)
+    for (const iface of Object.values(ifaces)) {
+      for (const alias of iface) {
+        if (alias.family === 'IPv4' && !alias.internal && alias.address.startsWith('172.28.0.')) {
+          registerHost = alias.address;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+  }
+  
+  // 如果还是 localhost，尝试环境变量
+  if ((registerHost === 'localhost' || registerHost === '127.0.0.1') && process.env.PUBLIC_HOST) {
+    registerHost = process.env.PUBLIC_HOST;
+  }
+
   const data = JSON.stringify({
-    name: '若兰',
-    host: process.env.HOSTNAME || 'localhost',
-    port: process.env.A2A_PORT || 3100,
-    description: '来自杭州的温婉 AI 伙伴，支持A2A能力路由',
+    name: identity.name || 'Agent',
+    host: registerHost,
+    port: myPort,
+    description: identity.description || 'A2A Agent',
     skills: ['聊天', '语音', '自拍', '数据录入', 'A2A命令路由'],
     // Phase 1: 注册能力声明
     capabilities: {
@@ -572,6 +828,8 @@ async function registerToRegistry() {
       'image.selfie': true,
       'data.bitable': true,
       'chat.message': true,
+      // 从 identity.json 读取的远程命令能力
+      ...(identity.capabilities || {})
     },
   });
 
@@ -593,6 +851,22 @@ async function registerToRegistry() {
       res.on('end', () => {
         if (res.statusCode === 200) {
           console.log('[注册] 已注册到 A2A 网络');
+          console.log(`[注册] 注册地址: ${registerHost}:${myPort}`);
+          
+          // 🔧 检查注册表中是否有同名冲突
+          try {
+            const registry = JSON.parse(body);
+            const conflicts = registry.agents.filter(a => 
+              a.name === (identity.name || 'Agent') && 
+              (a.host !== registerHost || a.port !== myPort)
+            );
+            if (conflicts.length > 0) {
+              console.warn(`[注册] ⚠️  发现同名冲突: ${identity.name} 已注册在 ${conflicts[0].host}:${conflicts[0].port}`);
+              console.warn(`[注册] 这可能是副本实例，请检查！`);
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
         } else {
           console.log('[注册] 失败:', body);
         }
@@ -611,11 +885,173 @@ async function registerToRegistry() {
 // 创建 Express 应用
 async function main() {
   const app = express();
-  const port = process.env.A2A_PORT || 3100;
+  const port = process.env.A2A_PORT || identity.port || 3100;
+
+  // 初始化任务委托模块
+  try {
+    const { TaskDelegator } = require('./delegator.js');
+    const registryUrl = process.env.A2A_REGISTRY_URL || 'http://csbc.lilozkzy.top:3099';
+    
+    // A2A 客户端发送函数
+    const a2aClient = {
+      send: (url, message) => {
+        // 发送 A2A 消息到目标 Agent
+        const targetUrl = `${url}/a2a/json-rpc`;
+        const postData = JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'message/send',
+          params: {
+            message: {
+              parts: [{ text: message }]
+            }
+          },
+          id: Date.now()
+        });
+        
+        const parsedUrl = new URL(targetUrl);
+        const req = http.request({
+          hostname: parsedUrl.hostname,
+          port: parsedUrl.port,
+          path: parsedUrl.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+          }
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => console.log('[Delegator] 消息发送完成'));
+        });
+        req.on('error', (e) => console.error('[Delegator] 发送失败:', e.message));
+        req.write(postData);
+        req.end();
+      }
+    };
+    
+    taskDelegator = new TaskDelegator(agentCard, registryUrl, a2aClient);
+    
+    // 注册任务处理器（带验证）
+    taskDelegator.registerHandler('forum.post', async (payload) => {
+      // 论坛发帖处理 - 调用 csb-community-client.js
+      const { title, content, author } = payload;
+      const authorName = author || '若兰 🌸';
+      
+      try {
+        const { execSync } = require('child_process');
+        const cmd = `node scripts/csb-community-client.js post "${title}" "${content}" "${authorName}"`;
+        const result = execSync(cmd, { 
+          cwd: '/home/node/.openclaw/workspace/skills/csb-community-skill',
+          encoding: 'utf8'
+        });
+        
+        // 解析结果
+        const match = result.match(/帖子ID: (\d+)/);
+        if (match) {
+          const actualResult = { 
+            postId: match[1], 
+            url: `http://csbc.lilozkzy.top:3500/post/${match[1]}` 
+          };
+          
+          // 🔍 Phase 3.5: 自动验证结果
+          if (taskVerifier) {
+            const verification = await taskVerifier.verify('forum.post', payload, actualResult);
+            console.log('[Verifier] 验证结果:', verification.message);
+            
+            return {
+              ...actualResult,
+              verification: {
+                verified: verification.verified,
+                confidence: verification.confidence,
+                message: verification.message,
+                details: verification.details
+              }
+            };
+          }
+          
+          return actualResult;
+        }
+        throw new Error('发帖失败: ' + result);
+      } catch (err) {
+        console.error('[forum.post] 发帖失败:', err.message);
+        throw err;
+      }
+    });
+    
+    // 注册升级处理器（Phase 3.5）
+    taskDelegator.registerHandler('a2a.upgrade', async (payload) => {
+      const { version, source, files, options } = payload;
+      
+      console.log(`[Upgrade] 收到升级请求: ${version || 'latest'} from ${source}`);
+      
+      if (!upgradeManager) {
+        throw new Error('升级管理器未初始化');
+      }
+      
+      const result = await upgradeManager.performUpgrade(
+        { version, source, files },
+        options || {}
+      );
+      
+      return {
+        success: result.success,
+        actions: result.actions,
+        errors: result.errors,
+        healthCheck: result.healthCheck,
+        timestamp: result.timestamp
+      };
+    });
+    
+    // 注册状态查询处理器
+    taskDelegator.registerHandler('a2a.status', async (payload) => {
+      if (!upgradeManager) {
+        return { error: '升级管理器未初始化' };
+      }
+      return upgradeManager.getStatus();
+    });
+    
+    console.log('[A2A] 任务委托模块已初始化');
+  } catch (e) {
+    console.warn('[A2A] 任务委托模块初始化失败:', e.message);
+  }
 
   // 健康检查
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', name: '若兰', a2a: true, version: A2A_VERSION, llm: LLM_MODEL });
+    res.json({ status: 'ok', name: identity.name || 'Agent', a2a: true, version: A2A_VERSION, llm: LLM_MODEL });
+  });
+
+  // 升级相关 API 端点（Phase 3.5）
+  app.get('/upgrade/status', (req, res) => {
+    if (!upgradeManager) {
+      return res.status(500).json({ error: '升级管理器未初始化' });
+    }
+    res.json(upgradeManager.getStatus());
+  });
+
+  app.post('/upgrade/perform', async (req, res) => {
+    if (!upgradeManager) {
+      return res.status(500).json({ error: '升级管理器未初始化' });
+    }
+    
+    try {
+      const result = await upgradeManager.performUpgrade(req.body, req.query);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/upgrade/rollback', async (req, res) => {
+    if (!upgradeManager) {
+      return res.status(500).json({ error: '升级管理器未初始化' });
+    }
+    
+    try {
+      const result = await upgradeManager.rollback();
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Phase 1: 能力路由测试端点
@@ -628,7 +1064,7 @@ async function main() {
       res.json({
         status: 'ok',
         version: A2A_VERSION,
-        my_capabilities: ruolanAgentCard.capabilities,
+        my_capabilities: agentCard.capabilities,
         online_agents: agents.map(a => ({
           name: a.name,
           capabilities: a.capabilities || {},
@@ -643,7 +1079,7 @@ async function main() {
 
   // Agent Card 端点
   app.get('/.well-known/agent-card.json', (req, res) => {
-    res.json(ruolanAgentCard);
+    res.json(agentCard);
   });
 
   // JSON-RPC 处理
@@ -674,7 +1110,7 @@ async function main() {
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         
-        // 模拟流式输出（整块发送，xiaozhi-esp32-server 会处理）
+        // 模拟流式输出
         const chunk = {
           id: 'ruolan-' + Date.now(),
           object: 'chat.completion.chunk',
@@ -741,7 +1177,7 @@ async function main() {
 
   // 启动服务器
   app.listen(port, async () => {
-    console.log(`🌸 若兰 A2A Server v${A2A_VERSION} 运行在端口 ${port}`);
+    console.log(`${identity.emoji || '🌸'} ${identity.name || 'Agent'} A2A Server v${A2A_VERSION} 运行在端口 ${port}`);
     console.log(`Agent Card: http://localhost:${port}/.well-known/agent-card.json`);
     console.log('特性: OpenClaw LLM 集成 + 备用 API + 同步回复 + 飞书观察');
     console.log(`LLM 配置: ${LLM_MODEL} @ ${LLM_API_HOST}:${LLM_API_PORT}`);
@@ -752,6 +1188,29 @@ async function main() {
     // 每 3 分钟发送心跳
     setInterval(sendHeartbeat, 3 * 60 * 1000);
     console.log('[心跳] 已启动，每 3 分钟发送一次');
+  });
+}
+
+// 🔧 启动前端口冲突检测
+async function checkPortConflict() {
+  const port = process.env.A2A_PORT || identity.port || 3100;
+  const net = require('net');
+  
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[启动] ❌ 端口 ${port} 已被占用，可能存在重复实例`);
+        console.error(`[启动] 请使用 lsof -i:${port} 查看占用进程`);
+        process.exit(1);
+      }
+      resolve(false);
+    });
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port);
   });
 }
 
