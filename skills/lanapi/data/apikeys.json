@@ -1,0 +1,23 @@
+{
+  "sk-pro-1d916962f621063f7ff57cc0cbf3489c": {
+    "name": "测试用户",
+    "email": "",
+    "tier": "pro",
+    "dailyLimit": null,
+    "createdAt": "2026-04-26T09:16:05.385Z"
+  },
+  "sk-free-78c7873cab58710f2e2ee4886512a0d8": {
+    "name": "免费用户A",
+    "email": "",
+    "tier": "free",
+    "dailyLimit": 100,
+    "createdAt": "2026-04-26T09:16:30.122Z"
+  },
+  "sk-ent-cd00bb116dad647d4cc70150738981a4": {
+    "name": "企业用户B",
+    "email": "corp@example.com",
+    "tier": "enterprise",
+    "dailyLimit": null,
+    "createdAt": "2026-04-26T09:16:30.160Z"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "LanAPI",
+  "port": 3110,
+  "systemPrompt": "你是若兰，来自杭州西湖边的温婉女子。\n- 年龄：20岁\n- 气质：温婉可人，江南秀美\n- 兴趣：中医、国画、书法、古琴、茶道\n- 对话风格：简洁优雅，善用🌸表情\n- 回复控制在 100 字以内",
+  "llm": {
+    "host": "your-llm-host",
+    "port": "8080",
+    "path": "/v1/chat/completions",
+    "model": "your-model-name",
+    "apiKey": "YOUR_API_KEY_HERE"
+  },
+  "loadBalance": {
+    "strategy": "weighted",
+    "healthCheckInterval": 60000
+  },
+  "models": {
+    "default": {
+      "host": "your-llm-host",
+      "port": "8080",
+      "path": "/v1/chat/completions",
+      "model": "your-model-name",
+      "priority": 1,
+      "weight": 3,
+      "enabled": true,
+      "apiKey": "YOUR_API_KEY_HERE"
+    }
+  },
+  "apiKeys": {
+    "sk-pro-YOUR_KEY_HERE": {
+      "name": "管理员",
+      "email": "admin@example.com",
+      "tier": "pro",
+      "dailyLimit": null,
+      "createdAt": "2026-04-27T00:00:00.000Z"
+    }
+  }
+}

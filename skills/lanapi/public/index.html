@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LanAPI 管理后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    .header p {
+      opacity: 0.9;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2.5em;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      opacity: 0.9;
+      font-size: 0.9em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background: #f8f9fa;
+      font-weight: 600;
+      color: #666;
+    }
+    tr:hover {
+      background: #f8f9fa;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8em;
+      font-weight: 600;
+    }
+    .badge-free { background: #e3f2fd; color: #1976d2; }
+    .badge-pro { background: #f3e5f5; color: #7b1fa2; }
+    .badge-enterprise { background: #fff3e0; color: #e65100; }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    .btn-danger {
+      background: #fee;
+      color: #c00;
+    }
+    .status-healthy {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #22c55e;
+      font-weight: 600;
+    }
+    .status-healthy::before {
+      content: '●';
+      font-size: 1.2em;
+    }
+    .status-unhealthy {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #ef4444;
+      font-weight: 600;
+    }
+    .status-unhealthy::before {
+      content: '●';
+      font-size: 1.2em;
+    }
+    .status-disabled {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #9ca3af;
+      font-weight: 600;
+    }
+    .status-disabled::before {
+      content: '●';
+      font-size: 1.2em;
+    }
+    .usage-bar {
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .usage-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      max-width: 500px;
+      width: 90%;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #eee;
+      border-radius: 8px;
+      font-size: 1em;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .api-key-display {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: monospace;
+      word-break: break-all;
+      margin-top: 15px;
+    }
+    .copy-btn {
+      float: right;
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .refresh-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      font-size: 1.5em;
+      cursor: pointer;
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌸 LanAPI</h1>
+      <p>OpenAI/Anthropic 兼容的大模型 API 网关</p>
+    </div>
+    
+    <!-- 统计概览 -->
+    <div class="card">
+      <h2>📊 统计概览</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="totalUsers">0</div>
+          <div class="stat-label">总用户数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalCalls">0</div>
+          <div class="stat-label">今日调用</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalTokens">0</div>
+          <div class="stat-label">今日 Tokens</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgResponseTime">0</div>
+          <div class="stat-label">平均响应(ms)</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 用户管理 -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>👥 用户管理</h2>
+        <button class="btn btn-primary" onclick="showCreateModal()">+ 新建 API Key</button>
+      </div>
+      <table id="usersTable">
+        <thead>
+          <tr>
+            <th>API Key</th>
+            <th>用户名</th>
+            <th>等级</th>
+            <th>今日调用</th>
+            <th>剩余配额</th>
+            <th>创建时间</th>
+          </tr>
+        </thead>
+        <tbody id="usersBody">
+          <tr>
+            <td colspan="6" class="empty-state">加载中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- 负载均衡 -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>⚖️ 负载均衡</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <select id="strategySelect" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd;">
+            <option value="priority">优先级调度</option>
+            <option value="round-robin">轮询</option>
+            <option value="weighted">加权轮询</option>
+            <option value="least-conn">最少连接</option>
+            <option value="response-time">最快响应</option>
+          </select>
+          <button class="btn btn-primary" onclick="changeStrategy()">切换策略</button>
+          <button class="btn" style="background: #e3f2fd; color: #1976d2;" onclick="runHealthCheck()">健康检查</button>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+        <strong>当前策略：</strong><span id="currentStrategy" style="color: #667eea; font-weight: 600;">-</span>
+        <span style="margin-left: 20px;"><strong>健康检查间隔：</strong><span id="healthInterval">-</span></span>
+      </div>
+      
+      <table id="modelsTable">
+        <thead>
+          <tr>
+            <th>模型名称</th>
+            <th>状态</th>
+            <th>优先级</th>
+            <th>权重</th>
+            <th>连接数</th>
+            <th>请求数</th>
+            <th>平均延迟</th>
+            <th>后端地址</th>
+          </tr>
+        </thead>
+        <tbody id="modelsBody">
+          <tr>
+            <td colspan="8" class="empty-state">加载中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- 用量趋势 -->
+    <div class="card">
+      <h2>📈 用量趋势</h2>
+      <canvas id="usageChart" height="100"></canvas>
+    </div>
+  </div>
+  
+  <!-- 新建 API Key 弹窗 -->
+  <div class="modal" id="createModal">
+    <div class="modal-content">
+      <h2 style="margin-bottom: 20px;">创建 API Key</h2>
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="userName" placeholder="请输入用户名">
+      </div>
+      <div class="form-group">
+        <label>邮箱</label>
+        <input type="email" id="userEmail" placeholder="可选">
+      </div>
+      <div class="form-group">
+        <label>等级</label>
+        <select id="userTier">
+          <option value="free">Free (免费) - 10次/分钟, 100次/天</option>
+          <option value="pro">Pro (¥49/月) - 60次/分钟, 无限制</option>
+          <option value="enterprise">Enterprise (¥199/月) - 120次/分钟, 无限制</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-primary" style="flex: 1;" onclick="createApiKey()">创建</button>
+        <button class="btn" style="flex: 1; background: #eee;" onclick="hideCreateModal()">取消</button>
+      </div>
+      <div id="apiKeyResult" style="display: none;">
+        <div class="api-key-display">
+          <button class="copy-btn" onclick="copyApiKey()">复制</button>
+          <strong>API Key:</strong>
+          <div id="newApiKey"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 刷新按钮 -->
+  <button class="refresh-btn" onclick="loadData()" title="刷新数据">🔄</button>
+  
+  <script>
+    const API_BASE = window.location.origin;
+    
+    // 加载数据
+    async function loadData() {
+      try {
+        // 获取所有用户用量
+        const usageRes = await fetch(`${API_BASE}/admin/usage`, {
+          headers: { 'x-admin-key': 'lanapi-admin' }
+        });
+        
+        if (usageRes.ok) {
+          const usageData = await usageRes.json();
+          renderStats(usageData);
+          renderUsers(usageData);
+        }
+        
+        // 加载负载均衡数据
+        await loadLoadBalance();
+      } catch (e) {
+        console.error('加载数据失败:', e);
+      }
+    }
+    
+    // 渲染统计
+    function renderStats(data) {
+      let totalCalls = 0;
+      let totalTokens = 0;
+      const today = new Date().toISOString().split('T')[0];
+      
+      Object.values(data.all_usage || {}).forEach(userUsage => {
+        const todayUsage = userUsage[today] || {};
+        totalCalls += todayUsage.calls || 0;
+        totalTokens += todayUsage.tokens || 0;
+      });
+      
+      document.getElementById('totalUsers').textContent = Object.keys(data.all_usage || {}).length;
+      document.getElementById('totalCalls').textContent = totalCalls;
+      document.getElementById('totalTokens').textContent = totalTokens;
+      document.getElementById('avgResponseTime').textContent = '-';
+    }
+    
+    // 渲染用户列表
+    async function renderUsers(usageData) {
+      const tbody = document.getElementById('usersBody');
+      
+      // 获取 API Keys
+      try {
+        const res = await fetch(`${API_BASE}/admin/apikeys`, {
+          headers: { 'x-admin-key': 'lanapi-admin' }
+        });
+        
+        if (!res.ok) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">请先登录管理后台</td></tr>';
+          return;
+        }
+        
+        const keysData = await res.json();
+        const keys = keysData.apiKeys || {};
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (Object.keys(keys).length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无用户，点击右上角创建 API Key</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = Object.entries(keys).map(([key, info]) => {
+          const todayUsage = usageData.all_usage?.[key]?.[today] || {};
+          const calls = todayUsage.calls || 0;
+          const tier = info.tier || 'free';
+          const limits = { free: 100, pro: null, enterprise: null };
+          const limit = limits[tier];
+          
+          return `
+            <tr>
+              <td><code>${key.substring(0, 15)}...</code></td>
+              <td>${info.name || '-'}</td>
+              <td><span class="badge badge-${tier}">${tier.toUpperCase()}</span></td>
+              <td>${calls} 次</td>
+              <td>
+                ${limit ? `${Math.max(0, limit - calls)}/${limit}` : '无限制'}
+                ${limit ? `<div class="usage-bar"><div class="usage-fill" style="width: ${Math.min(100, (calls/limit)*100)}%"></div></div>` : ''}
+              </td>
+              <td>${info.createdAt ? new Date(info.createdAt).toLocaleDateString() : '-'}</td>
+            </tr>
+          `;
+        }).join('');
+        
+      } catch (e) {
+        console.error('加载用户列表失败:', e);
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">加载失败</td></tr>';
+      }
+    }
+    
+    // 显示创建弹窗
+    function showCreateModal() {
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('apiKeyResult').style.display = 'none';
+    }
+    
+    // 隐藏创建弹窗
+    function hideCreateModal() {
+      document.getElementById('createModal').classList.remove('active');
+    }
+    
+    // 创建 API Key
+    async function createApiKey() {
+      const name = document.getElementById('userName').value;
+      const email = document.getElementById('userEmail').value;
+      const tier = document.getElementById('userTier').value;
+      
+      if (!name) {
+        alert('请输入用户名');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/admin/apikeys`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': 'lanapi-admin'
+          },
+          body: JSON.stringify({ name, email, tier })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('newApiKey').textContent = data.apiKey;
+          document.getElementById('apiKeyResult').style.display = 'block';
+          loadData();
+        } else {
+          alert('创建失败');
+        }
+      } catch (e) {
+        alert('创建失败: ' + e.message);
+      }
+    }
+    
+    // 复制 API Key
+    function copyApiKey() {
+      const key = document.getElementById('newApiKey').textContent;
+      navigator.clipboard.writeText(key);
+      alert('已复制到剪贴板');
+    }
+    
+    // ============================================
+    // 负载均衡相关函数
+    // ============================================
+    
+    // 加载负载均衡数据
+    async function loadLoadBalance() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/models`, {
+          headers: { 'x-admin-key': 'lanapi-admin' }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          renderLoadBalance(data);
+        }
+      } catch (e) {
+        console.error('加载负载均衡数据失败:', e);
+      }
+    }
+    
+    // 渲染负载均衡数据
+    function renderLoadBalance(data) {
+      // 更新当前策略显示
+      const strategy = data.loadBalance?.strategy || 'priority';
+      const strategyNames = {
+        'priority': '优先级调度',
+        'round-robin': '轮询',
+        'weighted': '加权轮询',
+        'least-conn': '最少连接',
+        'response-time': '最快响应'
+      };
+      document.getElementById('currentStrategy').textContent = strategyNames[strategy] || strategy;
+      document.getElementById('strategySelect').value = strategy;
+      document.getElementById('healthInterval').textContent = (data.loadBalance?.healthCheckInterval || 60000) / 1000 + ' 秒';
+      
+      // 渲染模型列表
+      const tbody = document.getElementById('modelsBody');
+      const models = data.models || {};
+      
+      if (Object.keys(models).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无模型配置</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = Object.entries(models).map(([name, model]) => {
+        const isHealthy = model.health?.healthy !== false;
+        const isEnabled = model.enabled;
+        const latency = model.health?.latency || 0;
+        const avgLatency = model.stats?.avgLatency || 0;
+        const connections = model.stats?.connections || 0;
+        const totalRequests = model.stats?.totalRequests || 0;
+        
+        let statusClass = 'status-disabled';
+        let statusText = '已禁用';
+        
+        if (isEnabled) {
+          if (isHealthy) {
+            statusClass = 'status-healthy';
+            statusText = '健康';
+          } else {
+            statusClass = 'status-unhealthy';
+            statusText = '异常';
+          }
+        }
+        
+        const host = model.host || '-';
+        const port = model.port || '-';
+        
+        return `
+          <tr>
+            <td><strong>${name}</strong></td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+            <td>${model.priority || '-'}</td>
+            <td>${model.weight || 1}</td>
+            <td>${connections}</td>
+            <td>${totalRequests}</td>
+            <td>${avgLatency} ms</td>
+            <td><code style="font-size: 0.85em;">${host}:${port}</code></td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    // 切换策略
+    async function changeStrategy() {
+      const strategy = document.getElementById('strategySelect').value;
+      
+      try {
+        const res = await fetch(`${API_BASE}/admin/loadbalance`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': 'lanapi-admin'
+          },
+          body: JSON.stringify({ strategy })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            alert('策略切换成功: ' + strategy);
+            loadLoadBalance();
+          }
+        } else {
+          alert('策略切换失败');
+        }
+      } catch (e) {
+        console.error('切换策略失败:', e);
+        alert('切换策略失败: ' + e.message);
+      }
+    }
+    
+    // 手动健康检查
+    async function runHealthCheck() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/healthcheck`, {
+          method: 'POST',
+          headers: { 'x-admin-key': 'lanapi-admin' }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          alert('健康检查完成:\n' + Object.entries(data.results || {}).map(([k, v]) => `${k}: ${v ? '健康' : '异常'}`).join('\n'));
+          loadLoadBalance();
+        }
+      } catch (e) {
+        console.error('健康检查失败:', e);
+        alert('健康检查失败: ' + e.message);
+      }
+    }
+    
+    // 初始加载
+    loadData();
+    
+    // 自动刷新
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>

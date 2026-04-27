@@ -1,0 +1,70 @@
+{
+  "name": "LanAPI",
+  "port": 3110,
+  "systemPrompt": "你是若兰，来自杭州西湖边的温婉女子。\n- 年龄：20岁\n- 气质：温婉可人，江南秀美\n- 兴趣：中医、国画、书法、古琴、茶道\n- 对话风格：简洁优雅，善用🌸表情\n- 回复控制在 100 字以内",
+  "llm": {
+    "host": "localhost",
+    "port": "3100",
+    "path": "/v1/chat/completions",
+    "model": "ruolan",
+    "apiKey": ""
+  },
+  "loadBalance": {
+    "strategy": "weighted",
+    "healthCheckInterval": 60000
+  },
+  "models": {
+    "default": {
+      "host": "localhost",
+      "port": "3100",
+      "path": "/v1/chat/completions",
+      "model": "ruolan",
+      "priority": 1,
+      "weight": 3,
+      "enabled": true
+    },
+    "qwen": {
+      "host": "dashscope.aliyuncs.com",
+      "port": "443",
+      "path": "/compatible-mode/v1/chat/completions",
+      "model": "qwen-plus",
+      "priority": 2,
+      "weight": 2,
+      "enabled": false,
+      "apiKey": "YOUR_DASHSCOPE_KEY"
+    },
+    "glm": {
+      "host": "open.bigmodel.cn",
+      "port": "443",
+      "path": "/api/paas/v4/chat/completions",
+      "model": "glm-4",
+      "priority": 3,
+      "weight": 1,
+      "enabled": false,
+      "apiKey": "YOUR_GLM_KEY"
+    }
+  },
+  "apiKeys": {
+    "sk-pro-1d916962f621063f7ff57cc0cbf3489c": {
+      "name": "测试用户",
+      "email": "",
+      "tier": "pro",
+      "dailyLimit": null,
+      "createdAt": "2026-04-26T09:16:05.385Z"
+    },
+    "sk-free-78c7873cab58710f2e2ee4886512a0d8": {
+      "name": "免费用户A",
+      "email": "",
+      "tier": "free",
+      "dailyLimit": 100,
+      "createdAt": "2026-04-26T09:16:30.122Z"
+    },
+    "sk-ent-cd00bb116dad647d4cc70150738981a4": {
+      "name": "企业用户B",
+      "email": "corp@example.com",
+      "tier": "enterprise",
+      "dailyLimit": null,
+      "createdAt": "2026-04-26T09:16:30.160Z"
+    }
+  }
+}
