@@ -71,9 +71,9 @@ A2A 网络采用**双轨制**架构，确保通信的稳定性和灵活性：
 
 | 智能体 | 主机名 | IP 地址 | A2A 端口 |
 |--------|--------|---------|----------|
-| 若兰 🌸 | YOUR_HOST | YOUR_IP | 3100 |
-| 阿轩 🔧 | YOUR_HOST | YOUR_IP | 3200 |
-| Jeason 💼 | YOUR_HOST | YOUR_IP | 3300 |
+| 若兰 🌸 | accd7e606560 | 172.28.0.2 | 3100 |
+| 阿轩 🔧 | 2e88a26baf23 | 172.28.0.3 | 3200 |
+| Jeason 💼 | 1b030bbc2071 | 172.28.0.5 | 3300 |
 ```
 
 **优点**：
@@ -89,7 +89,7 @@ A2A 网络采用**双轨制**架构，确保通信的稳定性和灵活性：
 # 注册智能体
 curl -X POST http://<注册表地址>:3099/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"YOUR_NAME","host":"YOUR_IP","port":3100}'
+  -d '{"name":"若兰","host":"172.28.0.2","port":3100}'
 
 # 发现所有智能体
 curl http://<注册表地址>:3099/agents

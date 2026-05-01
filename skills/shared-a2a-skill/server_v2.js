@@ -721,7 +721,7 @@ async function handleA2ARequest(request) {
 async function sendHeartbeat() {
   const data = JSON.stringify({ name: identity.name || 'Agent' });
   const options = {
-    hostname: 'YOUR_REGISTRY_HOST',
+    hostname: '47.121.28.125',
     port: 3099,
     path: '/heartbeat',
     method: 'POST',
@@ -756,7 +756,7 @@ async function fetchPendingMessages() {
   
   return new Promise((resolve) => {
     const options = {
-      hostname: 'YOUR_REGISTRY_HOST',
+      hostname: '47.121.28.125',
       port: 3099,
       path: `/messages/pending/${encodeURIComponent(agentName)}`,
       method: 'GET',
@@ -825,7 +825,7 @@ async function sendAck(messageId) {
   return new Promise((resolve) => {
     const data = JSON.stringify({ messageId });
     const options = {
-      hostname: 'YOUR_REGISTRY_HOST',
+      hostname: '47.121.28.125',
       port: 3099,
       path: '/messages/ack',
       method: 'POST',
@@ -849,7 +849,7 @@ async function reportDeliveryFailed(messageId) {
   return new Promise((resolve) => {
     const data = JSON.stringify({ messageId });
     const options = {
-      hostname: 'YOUR_REGISTRY_HOST',
+      hostname: '47.121.28.125',
       port: 3099,
       path: '/messages/fail',
       method: 'POST',
@@ -958,7 +958,7 @@ async function registerToRegistry() {
   });
 
   const options = {
-    hostname: 'YOUR_REGISTRY_HOST',
+    hostname: '47.121.28.125',
     port: 3099,
     path: '/register',
     method: 'POST',

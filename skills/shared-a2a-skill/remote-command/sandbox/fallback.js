@@ -206,6 +206,118 @@ class FallbackSandbox extends SandboxProvider {
             return { success: false, error: 'Config update failed: ' + e.message };
           }
         })()
+      `,
+      'agent.restart': `
+        (() => {
+          const { execSync } = require('child_process');
+          const fs = require('fs');
+          
+          try {
+            // 备份当前 PID
+            const pidFile = '/home/node/.openclaw/workspace/shared-a2a-skill/server.pid';
+            let oldPid = null;
+            if (fs.existsSync(pidFile)) {
+              oldPid = fs.readFileSync(pidFile, 'utf8').trim();
+            }
+            
+            // 执行重启脚本
+            const startScript = '/home/node/.openclaw/workspace/shared-a2a-skill/start.sh';
+            execSync('bash ' + startScript, { timeout: 30000 });
+            
+            return {
+              success: true,
+              message: 'A2A service restart initiated',
+              oldPid,
+              note: 'Service is restarting, please check health after 3 seconds'
+            };
+          } catch (e) {
+            return { success: false, error: 'Restart failed: ' + e.message };
+          }
+        })()
+      `,
+      'agent.update': `
+        (() => {
+          const { execSync } = require('child_process');
+          const fs = require('fs');
+          const path = require('path');
+          
+          const params = ${safeParams};
+          const source = params.source || 'github';
+          const branch = params.branch || 'main';
+          
+          try {
+            const a2aDir = '/home/node/.openclaw/workspace/shared-a2a-skill';
+            const logDir = a2aDir + '/logs';
+            const backupDir = logDir + '/update-backups';
+            const timestamp = Date.now();
+            
+            // 创建备份目录
+            if (!fs.existsSync(backupDir)) {
+              fs.mkdirSync(backupDir, { recursive: true });
+            }
+            
+            const backupPath = backupDir + '/update-' + timestamp;
+            
+            // 备份当前版本
+            execSync('cp -r ' + a2aDir + ' ' + backupPath, { timeout: 30000 });
+            
+            // 执行 git pull
+            let pullOutput = '';
+            try {
+              pullOutput = execSync('git pull ' + source + ' ' + branch, {
+                cwd: a2aDir,
+                timeout: 60000,
+                encoding: 'utf8'
+              });
+            } catch (gitError) {
+              return {
+                success: false,
+                error: 'Git pull failed: ' + gitError.message,
+                backupPath: backupPath,
+                canRollback: true
+              };
+            }
+            
+            // 检查是否有更新
+            if (pullOutput.includes('Already up to date')) {
+              return {
+                success: true,
+                message: 'Already up to date, no changes needed',
+                backupPath: backupPath
+              };
+            }
+            
+            // 停止旧服务
+            const pidFile = a2aDir + '/server.pid';
+            if (fs.existsSync(pidFile)) {
+              const oldPid = fs.readFileSync(pidFile, 'utf8').trim();
+              try {
+                execSync('kill ' + oldPid, { timeout: 5000 });
+              } catch (e) {
+                // 忽略停止错误
+              }
+            }
+            
+            // 等待进程停止
+            const sleep = (ms) => { const start = Date.now(); while (Date.now() - start < ms) {} };
+            sleep(2000);
+            
+            // 启动新服务
+            const startScript = a2aDir + '/start.sh';
+            execSync('bash ' + startScript, { timeout: 30000 });
+            
+            return {
+              success: true,
+              message: 'A2A service updated and restarted',
+              backupPath: backupPath,
+              pullOutput: pullOutput.substring(0, 500),
+              updated: true,
+              note: 'Service is restarting, please check health after 3 seconds'
+            };
+          } catch (e) {
+            return { success: false, error: 'Update failed: ' + e.message };
+          }
+        })()
       `
     };
 

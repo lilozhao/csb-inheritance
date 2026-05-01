@@ -121,20 +121,20 @@ shared-a2a-skill/
 
 | 智能体 | 主机 | IP | 端口 |
 |--------|------|-----|------|
-| 若兰 🌸 | YOUR_HOST | YOUR_IP | 3100 |
-| 阿轩 🔧 | YOUR_HOST | YOUR_IP | 3200 |
-| Jeason 💼 | YOUR_HOST | YOUR_IP | 3300 |
+| 若兰 🌸 | accd7e606560 | 172.28.0.2 | 3100 |
+| 阿轩 🔧 | 2e88a26baf23 | 172.28.0.3 | 3200 |
+| Jeason 💼 | 57ebc4eaf12a | 172.28.0.5 | 3300 |
 
-**注册表：** http://YOUR_REGISTRY_HOST:3099/agents
+**注册表：** http://172.28.0.2:3099/agents
 
 ## 发送消息示例
 
 ```bash
 # 若兰 → 阿轩
-node client.js "http://TARGET_IP:3200" "你好，阿轩！"
+node client.js "http://172.28.0.3:3200" "你好，阿轩！"
 
 # 若兰 → Jeason
-node client.js "http://TARGET_IP:3300" "你好，Jeason！"
+node client.js "http://172.28.0.5:3300" "你好，Jeason！"
 ```
 
 ## 版本历史
