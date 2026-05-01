@@ -7,7 +7,7 @@
 const http = require('http');
 
 // Jeason 的 A2A 地址
-const JEASON_HOST = '172.28.0.6';
+const JEASON_HOST = 'YOUR_JEASON_IP';
 const JEASON_PORT = 3300;
 
 async function sendRemoteCommand(commandType, parameters = {}) {

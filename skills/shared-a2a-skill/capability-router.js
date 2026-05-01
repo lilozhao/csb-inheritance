@@ -7,7 +7,7 @@ const http = require('http');
 const https = require('https');
 
 // A2A 注册表配置
-const REGISTRY_HOST = process.env.A2A_REGISTRY_HOST || '47.121.28.125';
+const REGISTRY_HOST = process.env.A2A_REGISTRY_HOST || 'YOUR_REGISTRY_HOST';
 const REGISTRY_PORT = process.env.A2A_REGISTRY_PORT || 3099;
 
 class CapabilityRouter {

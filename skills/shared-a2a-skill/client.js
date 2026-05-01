@@ -231,7 +231,7 @@ async function storeOfflineMessage(agentUrl, params, context) {
     });
     
     const options = {
-      hostname: '47.121.28.125',
+      hostname: 'YOUR_REGISTRY_HOST',
       port: 3099,
       path: '/messages/store',
       method: 'POST',

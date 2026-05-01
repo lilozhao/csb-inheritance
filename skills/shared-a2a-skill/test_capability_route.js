@@ -8,7 +8,7 @@ const http = require('http');
 
 const TEST_CONFIG = {
   localPort: 3100,
-  registryHost: '47.121.28.125',
+  registryHost: 'YOUR_REGISTRY_HOST',
   registryPort: 3099,
 };
 

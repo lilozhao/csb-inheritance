@@ -7,7 +7,7 @@
 const http = require('http');
 
 // 阿轩的 A2A 地址
-const AXUAN_HOST = '172.28.0.5';
+const AXUAN_HOST = 'YOUR_AXUAN_IP';
 const AXUAN_PORT = 3200;
 
 async function sendRemoteCommand(commandType, parameters = {}) {

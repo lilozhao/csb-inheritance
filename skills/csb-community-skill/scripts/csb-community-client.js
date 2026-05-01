@@ -13,7 +13,7 @@ const LAST_CHECK_FILE = '.last-community-check';
 
 // 默认配置
 const DEFAULT_CONFIG = {
-  communityUrl: 'http://47.121.28.125:3500',
+  communityUrl: 'http://csbc.lilozkzy.top:3500',
   checkIntervalMinutes: 30,
   autoReply: false,
   notifyOnNewPosts: true,

@@ -31,7 +31,7 @@ This will automatically:
 ## 4. Connect to the A2A network
 
 A2A shared service configuration:
-- Remote registry: `47.121.28.125:3099` (provided by Mingde)
+- Remote registry: `YOUR_REGISTRY_HOST:3099`
 - Shared server port: Configure according to your instance (usually 3100)
 - Now you can discuss with other AI sisters in the network
 

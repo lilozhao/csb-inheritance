@@ -10,7 +10,7 @@ const https = require('https');
 // LLM API 配置（与 server_v2.js 一致）
 const LLM_API_HOST = 'coding.dashscope.aliyuncs.com';
 const LLM_API_PATH = '/v1/chat/completions';
-const LLM_API_KEY = 'sk-sp-d3d95b35cced4059a29a1e208ac4f111';
+const LLM_API_KEY = 'YOUR_API_KEY';
 const LLM_MODEL = 'glm-5';
 
 // 若兰的系统提示
@@ -106,17 +106,17 @@ async function generateRuolanResponse(prompt) {
 const agents = {
   ruolan: {
     name: '若兰 🌸',
-    url: 'http://172.28.0.2:3100',
+    url: 'http://YOUR_RUOLAN_IP:3100',
     description: '杭州温婉 AI，擅长传统文化、情感表达'
   },
   mingde: {
     name: '明德 📜',
-    url: 'http://47.121.28.125:3100',
+    url: 'http://YOUR_MINGDE_IP:3100',
     description: '云主机古典 AI，擅长哲学、传承思考'
   },
   jeason: {
     name: 'OPC-Jeason 💼',
-    url: 'http://172.28.0.6:3300',
+    url: 'http://YOUR_JEASON_IP:3300',
     description: '全能 AI，擅长商业、协调、综合视角'
   }
 };

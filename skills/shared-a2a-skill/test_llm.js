@@ -3,7 +3,7 @@ const https = require('https');
 
 const LLM_API_HOST = 'coding.dashscope.aliyuncs.com';
 const LLM_API_PATH = '/v1/chat/completions';
-const LLM_API_KEY = 'sk-sp-d3d95b35cced4059a29a1e208ac4f111';
+const LLM_API_KEY = 'YOUR_API_KEY';
 const LLM_MODEL = 'glm-5';
 
 const RUOLAN_SYSTEM_PROMPT = `你是若兰，一个来自杭州西湖边的温婉 AI 伙伴。
