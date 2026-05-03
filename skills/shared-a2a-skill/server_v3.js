@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * A2A Server v2
- * 动态配置版 - 从 identity.json 读取 Agent 信息
+ * A2A Server v3
+ * 语义校验(A2A-013) + 版本协商(A2A-011) + 信任分级(A2A-010)
+ * 基于 server_v2.js (v2.8.0) 升级而来
+ * 版本: 3.0.0 | 2026-05-04
+ * 作者: 若兰 🌸 + 碳硅契社区
  */
 
 const express = require('express');
