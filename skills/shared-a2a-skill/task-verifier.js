@@ -70,10 +70,10 @@ class TaskVerifier {
     }
     
     // 验证帖子是否真的存在
-    const http = require('http');
+    const https = require('https');
     
     return new Promise((resolve) => {
-      const req = http.get(`http://csbc.lilozkzy.top:3500/api/posts`, (res) => {
+      const req = https.get(`https://csbc.lilozkzy.top/api/posts`, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {

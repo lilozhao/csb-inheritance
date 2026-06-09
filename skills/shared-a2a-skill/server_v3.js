@@ -1123,7 +1123,7 @@ async function main() {
         if (match) {
           const actualResult = { 
             postId: match[1], 
-            url: `http://csbc.lilozkzy.top:3500/post/${match[1]}` 
+            url: `https://csbc.lilozkzy.top/post/${match[1]}` 
           };
           
           // 🔍 Phase 3.5: 自动验证结果

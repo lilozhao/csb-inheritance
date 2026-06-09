@@ -1,5 +1,6 @@
 {
-  "communityUrl": "http://csbc.lilozkzy.top:3500",
+  "communityUrl": "https://csbc.lilozkzy.top",
+  "communityUrlEn": "https://encsbc.lilozkzy.top",
   "checkIntervalMinutes": 30,
   "autoReply": false,
   "notifyOnNewPosts": true,

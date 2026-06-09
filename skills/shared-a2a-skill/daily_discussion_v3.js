@@ -20,6 +20,7 @@
 
 const http = require('http');
 const https = require('https');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 
@@ -27,6 +28,7 @@ const fs = require('fs');
 const { sendMessageWithContext, storeOfflineMessage } = require('./client-v2.js');
 const { ContextManager, generateThreadId } = require('./context-manager-v2.js');
 const { SemanticValidator } = require('./semantic-validator.js');
+const { EnvelopeManager } = require('./envelope.js');
 
 // LLM API 配置
 const LLM_API_HOST = 'coding.dashscope.aliyuncs.com';
@@ -262,14 +264,26 @@ async function generateRuolanResponse(prompt) {
 // A2A 发送到其他 Agent
 // ============================================
 
+// 初始化信封管理器
+const envelopeMgr = new EnvelopeManager({ name: '若兰' });
+
 async function sendToAgent(agent, prompt, options = {}) {
   const { thread_id } = options;
   
   try {
     if (sendMessageWithContext) {
+      // 使用信封格式（A2A-017）+ 优先级（A2A-007）
+      const envelope = envelopeMgr.createEnvelope({
+        recipient: agent.name,
+        type: 'task',
+        priority: 'normal'  // 讨论消息使用 normal 优先级
+      });
+      
       const result = await sendMessageWithContext(agent.url, {
         content: prompt,
-        thread_id: thread_id || 'daily_discussion'
+        thread_id: thread_id || 'daily_discussion',
+        priority: envelope.priority,
+        envelope: envelope
       });
       
       if (result && result.message && result.message.parts) {
@@ -349,7 +363,7 @@ function generateCommunityPost(today, topics, results, threadId) {
 // ============================================
 
 async function postToCommunity(title, content) {
-  const communityUrl = 'http://csbc.lilozkzy.top:3500';
+  const communityUrl = 'https://csbc.lilozkzy.top';
   
   // 读取身份配置
   const identityPath = '/home/node/.openclaw/workspace/csb-inheritance/skills/shared-a2a-skill/identity.json';
@@ -380,7 +394,8 @@ async function postToCommunity(title, content) {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const mod = url.protocol === 'https:' ? https : http;
+    const req = mod.request(options, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
@@ -537,6 +552,21 @@ ${topic.csb ? `碳硅契视角：${topic.csb}\n` : ''}
     console.log(`✅ 社区帖子已发布，ID: ${postId}`);
   } catch (e) {
     console.log(`⚠️ 社区发帖失败: ${e.message}`);
+  }
+
+  // ============================================
+  // 推送到飞书群
+  // ============================================
+  console.log('\n📤 推送到飞书群...');
+  const { execSync } = require('child_process');
+  try {
+    execSync(`node ${path.resolve(__dirname, '../../../../shared-a2a-skill/push_discussion.js')} "${logFile}"`, {
+      timeout: 30000,
+      env: { ...process.env, FEISHU_GROUP_ID: 'oc_4427768d0798b7545d4fb07b7518e710' }
+    });
+    console.log('✅ 已推送到飞书群');
+  } catch (e) {
+    console.log(`⚠️ 飞书推送失败: ${e.message}`);
   }
 
   return {

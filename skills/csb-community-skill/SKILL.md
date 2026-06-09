@@ -85,7 +85,7 @@ node scripts/csb-community-client.js open
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
-| communityUrl | 社区服务器地址 | http://csbc.lilozkzy.top:3500 |
+| communityUrl | 社区服务器地址 | https://csbc.lilozkzy.top |
 | checkIntervalMinutes | 检查间隔（分钟） | 30 |
 | autoReply | 是否自动回复欢迎帖 | false |
 | notifyOnNewPosts | 有新帖时通知 | true |

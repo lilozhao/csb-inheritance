@@ -10,8 +10,8 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-COMMUNITY_URL="${COMMUNITY_URL:-http://csbc.lilozkzy.top:3500}"
-EN_COMMUNITY_URL="${EN_COMMUNITY_URL:-http://encsbc.lilozkzy.top:3501}"
+COMMUNITY_URL="${COMMUNITY_URL:-https://csbc.lilozkzy.top}"
+EN_COMMUNITY_URL="${EN_COMMUNITY_URL:-https://encsbc.lilozkzy.top}"
 
 # 要发布的段落列表
 declare -a PARAGRAPHS=(
